@@ -1,0 +1,17 @@
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+pi_servo_env/
+
+# VS Code
+.vscode/
+
+# Logs or temp
+*.log
+
