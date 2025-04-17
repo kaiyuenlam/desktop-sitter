@@ -71,7 +71,7 @@ class AnimatedGIFPlayer(tk.Tk):
 if __name__ == "__main__":
     # Map keywords to GIF file paths
     gif_mapping = {
-        "happy": "HappyGTalk.gif",
+        "happy": "HappyTalk.gif",
         "surprised": "HappyTalk.gif",
         "angry": "SadTalk.gif",
         "anxious": "SadTalk.gif",
