@@ -6,7 +6,7 @@ class AnimatedGIFPlayer(tk.Tk):
     def __init__(self, gif_mapping):
         super().__init__()
         self.title("Animated GIF Player")
-        self.geometry("400x400")  # Set window size
+        self.geometry("1280x1080")  # Set window size
 
         # Map keywords to GIF files
         self.gif_mapping = gif_mapping
@@ -55,7 +55,7 @@ class AnimatedGIFPlayer(tk.Tk):
     def handle_terminal_input(self):
         """Handle user input from the terminal."""
         while True:
-            print("\nInput the detected emotion here (For Testing): happy / surprised / angry / anxious : ")
+            print("\nInput the detected emotion here (For Testing): happy / surprised / angry / anxious / neutral / sleepy: ")
             user_input = input().strip().lower()
 
             if user_input == "exit":
@@ -71,10 +71,12 @@ class AnimatedGIFPlayer(tk.Tk):
 if __name__ == "__main__":
     # Map keywords to GIF file paths
     gif_mapping = {
-        "happy": "koops.gif",
-        "surprised": "goomba.gif",
-        "angry": "snifit.gif",
-        "anxious": "hammerbro.gif"
+        "happy": "HappyGTalk.gif",
+        "surprised": "HappyTalk.gif",
+        "angry": "SadTalk.gif",
+        "anxious": "SadTalk.gif",
+        "neutral": "Idle.gif",
+        "sleepy": "Sleep.gif"
     }
 
     # Create and run the app
