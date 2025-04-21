@@ -1,12 +1,15 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 import threading
+import time
+import os
 
 class AnimatedGIFPlayer(tk.Tk):
+
     def __init__(self, gif_mapping):
         super().__init__()
         self.title("Animated GIF Player")
-        self.geometry("1280x1080")  # Set window size
+        self.geometry("432x324")  # Set window size
 
         # Map keywords to GIF files
         self.gif_mapping = gif_mapping
@@ -36,6 +39,7 @@ class AnimatedGIFPlayer(tk.Tk):
             while True:
                 frame = ImageTk.PhotoImage(gif.copy())
                 self.frames.append(frame)
+                time.sleep(0.02)
                 gif.seek(len(self.frames))  # Move to the next frame
         except EOFError:
             pass  # End of GIF reached
@@ -55,30 +59,23 @@ class AnimatedGIFPlayer(tk.Tk):
     def handle_terminal_input(self):
         """Handle user input from the terminal."""
         while True:
-            print("\nInput the detected emotion here (For Testing): happy / surprised / angry / anxious / neutral / sleepy: ")
-            user_input = input().strip().lower()
+            user_input = input()
+            print(f"Displaying GIF for keyword: {user_input}")
+            self.play_gif(self.gif_mapping[user_input])
 
-            if user_input == "exit":
-                print("Exiting...")
-                self.quit()
-                break
-            elif user_input in self.gif_mapping:
-                print(f"Displaying GIF for keyword: {user_input}")
-                self.play_gif(self.gif_mapping[user_input])
-            else:
-                print("Invalid keyword. Please try again.")
 
-if __name__ == "__main__":
-    # Map keywords to GIF file paths
-    gif_mapping = {
-        "happy": "HappyTalk.gif",
-        "surprised": "HappyTalk.gif",
-        "angry": "SadTalk.gif",
-        "anxious": "SadTalk.gif",
-        "neutral": "Idle.gif",
-        "sleepy": "Sleep.gif"
-    }
+# Map keywords to GIF file paths
+gif_mapping = {
+    "happy": r"C:\Users\lewis\Documents\GitHub\desktop-sitter\emotion_detect\HappyTalk.gif",
+    "surprise": r"C:\Users\lewis\Documents\GitHub\desktop-sitter\emotion_detect\HappyTalk.gif",
+    "angry": r"C:\Users\lewis\Documents\GitHub\desktop-sitter\emotion_detect\SadTalk.gif",
+    "sad": r"C:\Users\lewis\Documents\GitHub\desktop-sitter\emotion_detect\SadTalk.gif",
+    "neutral": r"C:\Users\lewis\Documents\GitHub\desktop-sitter\emotion_detect\Idle.gif",
+    "fear": r"C:\Users\lewis\Documents\GitHub\desktop-sitter\emotion_detect\HappyTalk.gif",
+    "disgust": r"C:\Users\lewis\Documents\GitHub\desktop-sitter\emotion_detect\SadTalk.gif",
+    "sleepy": r"C:\Users\lewis\Documents\GitHub\desktop-sitter\emotion_detect\Sleep.gif"
+}
 
-    # Create and run the app
-    app = AnimatedGIFPlayer(gif_mapping)
-    app.mainloop()
+# Create and run the app
+app = AnimatedGIFPlayer(gif_mapping)
+app.mainloop()
