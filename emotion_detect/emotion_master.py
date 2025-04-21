@@ -40,7 +40,6 @@ def get_chatbot_response(emotion):
         return f"Chatbot error: {str(e)}"
 
 # ========== Emotion Detection ==========
-
 face_cascade = cv2.CascadeClassifier(
     cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 if face_cascade.empty():
@@ -61,16 +60,19 @@ def analyze_emotion(image_path):
     try:
         results = DeepFace.analyze(img_path=image_path, actions=['emotion'],
                                    enforce_detection=False, detector_backend='opencv')
+        # Standardize output
         if results and isinstance(results, list) and len(results) > 0:
             dominant_emotion = results[0]['dominant_emotion']
+            emotion_scores = results[0]['emotion']
         elif results and not isinstance(results, list):
             dominant_emotion = results['dominant_emotion']
+            emotion_scores = results['emotion']
         else:
-            dominant_emotion = None
-        return dominant_emotion
+            return None, None
+        return dominant_emotion, emotion_scores
     except Exception as e:
         print(f"Emotion analysis failed: {str(e)}")
-        return None
+        return None, None
 
 # ========== Thread-Safe State ==========
 class SharedState:
@@ -177,8 +179,16 @@ def webcam_emotion_thread(shared_state):
         faces = face_cascade.detectMultiScale(
             gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
+        # Draw rectangles around detected faces
         for (x, y, w, h) in faces:
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+        # Display status text overlays
+        cv2.putText(frame, "Press ESC to exit", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        if len(faces) > 0:
+            cv2.putText(frame, "Face Detected", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        else:
+            cv2.putText(frame, "No Face Detected", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
         current_time = time.time()
         if current_time - last_analysis_time >= analysis_interval and len(faces) > 0:
@@ -188,15 +198,23 @@ def webcam_emotion_thread(shared_state):
             cv2.imwrite(image_path, processed_frame)
             while not os.path.exists(image_path):
                 time.sleep(0.1)
-            dominant_emotion = analyze_emotion(image_path)
+            dominant_emotion, emotion_scores = analyze_emotion(image_path)
             if os.path.exists(image_path):
                 os.remove(image_path)
-            if dominant_emotion and dominant_emotion != last_emotion:
-                print(f"[Webcam] Detected Emotion: {dominant_emotion}")
-                chatbot_response = get_chatbot_response(dominant_emotion)
-                print(f"[Webcam] Chatbot: {chatbot_response}")
-                shared_state.set(dominant_emotion, chatbot_response)
-                last_emotion = dominant_emotion
+            if dominant_emotion:
+                # Format and print scores to terminal
+                if emotion_scores:
+                    emotion_str = ", ".join([f"{k}: {v:.2f}%" for k, v in emotion_scores.items()])
+                    print(f"[Webcam] Detected Emotion: {dominant_emotion}")
+                    print(f"[Webcam] Emotion Scores: {emotion_str}")
+                else:
+                    print(f"[Webcam] Detected Emotion: {dominant_emotion}")
+                # Only trigger update if different or it's the first run
+                if dominant_emotion != last_emotion or last_analysis_time == 0:
+                    chatbot_response = get_chatbot_response(dominant_emotion)
+                    print(f"[Webcam] Chatbot: {chatbot_response}")
+                    shared_state.set(dominant_emotion, chatbot_response)
+                    last_emotion = dominant_emotion
             last_analysis_time = current_time
 
         cv2.imshow('Webcam - Real-Time Emotion Detection (ESC to exit)', frame)
