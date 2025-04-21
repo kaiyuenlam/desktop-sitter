@@ -1,36 +1,37 @@
-#!/usr/bin/env python3
+# test_camera.py
+
 import cv2
+from picamera.array import PiRGBArray
+from picamera import PiCamera
+import time
 
-def main():
-    # Open the default USB camera (usually index 0)
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+# initialize the camera and grab a reference to the raw camera capture
+camera = PiCamera()
+camera.rotation = 180
+camera.hflip = True
+camera.vflip = False
+camera.resolution = (640, 480)
+camera.framerate = 24
+rawCapture = PiRGBArray(camera, size=(640, 480))
 
-    if not cap.isOpened():
-        print("Error: Cannot open camera")
-        return
+# allow the camera to warmup
+time.sleep(2.0)
 
-    print("Camera is working. Press 'q' to exit the window.")
+print("[INFO] starting video stream, press 'q' to exit")
+for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+    image = frame.array
 
-    while True:
-        # Capture frame-by-frame
-        ret, frame = cap.read()
+    # show the frame on screen
+    cv2.imshow("PiCamera Test", image)
+    key = cv2.waitKey(1) & 0xFF
 
-        if not ret:
-            print("Can't receive frame (stream end?). Exiting ...")
-            break
+    # clear the stream in preparation for the next frame
+    rawCapture.truncate(0)
 
-        # Display the resulting frame
-        cv2.imshow('USB Camera Test', frame)
+    # if the `q` key was pressed, break from the loop
+    if key == ord("q"):
+        break
 
-        # Exit when 'q' key is pressed
-        if cv2.waitKey(1) == ord('q'):
-            break
+cv2.destroyAllWindows()
+camera.close()
 
-    # When everything is done, release the capture and close windows
-    cap.release()
-    cv2.destroyAllWindows()
-
-if __name__ == '__main__':
-    main()

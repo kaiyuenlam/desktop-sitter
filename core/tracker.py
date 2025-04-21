@@ -1,14 +1,8 @@
 """
-tracker.py  –  smooth Desktop‑Sitter face‑tracking loop
--------------------------------------------------------
-
-Modes
-  INIT   : start‑up coarse sweep, lock largest face
-  TRACK  : face visible  – smooth absolute‑angle centring
-  HOLD   : lost <10 s    – stay still
-  MICRO  : lost 10‑60 s  – ±15°/±10° local grid
-  SWEEP  : lost ≥60 s    – full pan sweep, tilt 150↔100°
-
+tracker.py  –  INIT + TRACK
+• Tilt 100‑150°, pan 30‑150°
+• Half‑resolution detection for latency
+• Dead‑zone is set dynamically from the largest INIT face
 """
 
 import math, time, cv2
@@ -16,148 +10,116 @@ from camera   import Camera
 from servo    import PanTilt
 from detector import find_faces
 
-# ---------- FOV constants (50° diagonal) ----------
+# ---------- FOV (50° diagonal, 4:3 sensor) ----------
 THETA_D=50
 THETA_H=2*math.degrees(math.atan(math.tan(math.radians(THETA_D/2))*4/5))
 THETA_V=2*math.degrees(math.atan(math.tan(math.radians(THETA_D/2))*3/5))
 
-# ---------- behaviour knobs -----------------------
-DEAD_X,DEAD_Y =40,40
-ALPHA =0.35
-STEP_DELAY   =0.075
-SETTLE_EXTRA =0.04
-MAX_DELTA    =1.0          # 1 °/frame
-MICRO_AFTER  =10.0
-FULL_AFTER   =60.0
-NOISE_RATIO  =0.5
-LOCAL_PAN_RANGE,LOCAL_TILT_RANGE=15,10
-LOCAL_STEP   =1            # MICRO moves 1 °
-SEARCH_TILT_MIN=100
-FONT=cv2.FONT_HERSHEY_SIMPLEX
+# ---------- knobs -----------------------------------
+SCALE           = 0.5          # 320×240 detector
+ALPHA_PAN       = 0.35
+ALPHA_TILT      = 0.25
+MAX_PAN_DELTA   = 1.0          # ° per frame
+MAX_TILT_DELTA  = 0.5
+STEP_DELAY      = 0.075
+SETTLE_EXTRA    = 0.04
+MIN_AREA_RATIO  = 0.1         # 10 % @ half‑res
+ASPECT_TOL      = 0.25
+INIT_PAN_STEP   = 15
+INIT_TILT_STEP  = 10
+FONT            = cv2.FONT_HERSHEY_SIMPLEX
+# -----------------------------------------------------
 
-class Mode: INIT,TRACK,HOLD,MICRO,SWEEP=range(5)
-MODE_NAMES=["INIT","TRACK","HOLD","MICRO","SWEEP"]
+class Mode: INIT, TRACK = range(2)
+MODE_NAMES = ["INIT","TRACK"]
 
 class FaceTracker:
-    def __init__(self,res=(640,480),debug=True):
-        self.cam, self.pt = Camera(resolution=res), PanTilt()
-        self.debug=debug
-        self.w,self.h=res
+    def __init__(self, res=(640,480), debug=True):
+        self.cam  = Camera(resolution=res)
+        self.pt   = PanTilt(step=1.0)
+        self.debug= debug
+        self.w, self.h = res
         self.deg_px_x, self.deg_px_y = THETA_H/self.w, THETA_V/self.h
-        self.mode=Mode.INIT; self.last_seen=0
-        self.last_pan,self.last_tilt=self.pt._current_pan,self.pt._current_tilt
-        self.last_area=None; self._pan_dir,self._tilt_dir=-1,1; self._micro_iter=iter(())
 
-    # ------------- utilities ----------
-    def _log(self,m): print(m) if self.debug else None
-    @property
-    def _pan(self):  return self.pt._current_pan
-    @property
-    def _tilt(self): return self.pt._current_tilt
+        # default dead‑zone (will be overwritten after INIT)
+        self.dead_x, self.dead_y = 40, 40
+        self.mode = Mode.INIT
 
-    # ------------- centring -----------
-    def _centre(self,cx,cy):
-        dx,dy=cx-self.w/2,cy-self.h/2
-        raw_pan  = self._pan  - dx*self.deg_px_x       # 30°→150°
-        raw_tilt = self._tilt - dy*self.deg_px_y       # 100°→150°
+    # ---------- helper --------------------------------
+    def _centre(self, cx, cy):
+        dx, dy = cx - self.w/2, cy - self.h/2
+        if abs(dx) < self.dead_x and abs(dy) < self.dead_y:
+            return
 
-        sp = self._pan  + ALPHA*(raw_pan -self._pan)
-        st = self._tilt + ALPHA*(raw_tilt-self._tilt)
+        goal_pan  = self.pt._current_pan  - dx * self.deg_px_x
+        goal_tilt = self.pt._current_tilt - dy * self.deg_px_y
 
-        tp = max(self._pan- MAX_DELTA, min(self._pan+ MAX_DELTA, sp))
-        tt = max(self._tilt-MAX_DELTA, min(self._tilt+MAX_DELTA, st))
+        sp = self.pt._current_pan  + ALPHA_PAN  * (goal_pan  - self.pt._current_pan)
+        st = self.pt._current_tilt + ALPHA_TILT * (goal_tilt - self.pt._current_tilt)
 
-        moved= abs(tp-self._pan)>1e-2 or abs(tt-self._tilt)>1e-2
+        tp = max(self.pt._current_pan -MAX_PAN_DELTA,
+                 min(self.pt._current_pan +MAX_PAN_DELTA,  sp))
+        tt = max(self.pt._current_tilt-MAX_TILT_DELTA,
+                 min(self.pt._current_tilt+MAX_TILT_DELTA, st))
+
+        moved = abs(tp-self.pt._current_pan)>1e-2 or abs(tt-self.pt._current_tilt)>1e-2
         self.pt.set_pan(tp); self.pt.set_tilt(tt)
         if moved: time.sleep(SETTLE_EXTRA)
-        self.last_pan,self.last_tilt=self._pan,self._tilt
 
-    # ------------- MICRO grid ---------
-    def _init_micro(self):
-        pans  = range(int(max(30 ,self.last_pan-LOCAL_PAN_RANGE)),
-                      int(min(150,self.last_pan+LOCAL_PAN_RANGE))+1, LOCAL_STEP)
-        tilts = range(int(max(SEARCH_TILT_MIN,self.last_tilt-LOCAL_TILT_RANGE)),
-                      int(min(150,             self.last_tilt+LOCAL_TILT_RANGE))+1, LOCAL_STEP)
-        order=[(p,t) for p in pans for t in tilts]
-        self._micro_iter=iter(order)
-
-    def _micro_step(self):
-        try:
-            p,t=next(self._micro_iter)
-            self.pt.set_pan(p); self.pt.set_tilt(t)
-        except StopIteration: self.mode=Mode.SWEEP
-        time.sleep(STEP_DELAY)
-
-    # ------------- SWEEP --------------
-    def _tilt_bounce(self):
-        if self._tilt_dir>0:
-            if self._tilt-1>=SEARCH_TILT_MIN: self.pt.tilt_down()
-            else: self._tilt_dir=-1
-        else:
-            if self._tilt+1<=150: self.pt.tilt_up()
-            else: self._tilt_dir=1
-
-    def _sweep_step(self):
-        if self._pan_dir<0:
-            self.pt.pan_left()
-            if self._pan>=150: self._pan_dir=1; self._tilt_bounce()
-        else:
-            self.pt.pan_right()
-            if self._pan<=30:  self._pan_dir=-1; self._tilt_bounce()
-        time.sleep(STEP_DELAY)
-
-    # ------------- initial scan -------
+    # ---------- INIT sweep ----------------------------
     def _initial_scan(self):
-        best=0; best_ang=None
-        for tilt in range(150, SEARCH_TILT_MIN-1,-10):
+        best=0; best_ang=None; best_wh=(0,0)
+        for tilt in range(150, 99, -INIT_TILT_STEP):
             self.pt.set_tilt(tilt)
-            for pan in range(30,151,15):
-                self.pt.set_pan(pan); time.sleep(0.1)
+            for pan in range(30, 151, INIT_PAN_STEP):
+                self.pt.set_pan(pan); time.sleep(0.08)
                 gray=cv2.cvtColor(self.cam.get_frame(),cv2.COLOR_BGR2GRAY)
-                faces=find_faces(gray)
+                small=cv2.resize(gray,(0,0),fx=SCALE,fy=SCALE)
+                faces=find_faces(small,min_area_ratio=MIN_AREA_RATIO,
+                                       aspect_ratio_tol=ASPECT_TOL)
                 if faces:
-                    _,_,w,h=max(faces,key=lambda r:r[2]*r[3]); area=w*h
-                    if area>best: best,best_ang=area,(pan,tilt)
+                    _,_,w,h=faces[0]; area=w*h
+                    if area>best:
+                        best, best_ang = area, (pan,tilt)
+                        best_wh = (int(w/SCALE), int(h/SCALE))  # rescale
         if best_ang:
             self.pt.set_pan(best_ang[0]); self.pt.set_tilt(best_ang[1])
-            self.last_pan,self.last_tilt=best_ang
-            self.last_seen=time.time(); self.mode=Mode.TRACK
-        else: self.mode=Mode.SWEEP
+            # ----- dynamic dead‑zone -------------------
+            self.dead_x = best_wh[0] // 2
+            self.dead_y = best_wh[1] // 2
+            if self.debug:
+                print(f"[INIT] dead‑zone set to ±{self.dead_x} × ±{self.dead_y} px")
+        self.mode = Mode.TRACK
 
-    # ------------- main loop ----------
+    # ---------- main loop -----------------------------
     def run(self):
-        self._log("[INFO] tracker start"); self._initial_scan()
+        if self.debug: print("[INFO] tracker start")
+        self._initial_scan()
         try:
             while True:
-                frame=self.cam.get_frame(); gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
-                faces=find_faces(gray)
+                full = self.cam.get_frame()
+                gray = cv2.cvtColor(full,cv2.COLOR_BGR2GRAY)
+                small=cv2.resize(gray,(0,0),fx=SCALE,fy=SCALE)
 
-                ok=False
+                faces=find_faces(small,min_area_ratio=MIN_AREA_RATIO,
+                                       aspect_ratio_tol=ASPECT_TOL)
                 if faces:
-                    x,y,w,h=max(faces,key=lambda r:r[2]*r[3]); area=w*h
-                    if self.last_area is None or area>=NOISE_RATIO*self.last_area:
-                        ok=True; self.last_area=area; cx,cy=x+w/2,y+h/2
-                        cv2.rectangle(frame,(x,y),(x+w,y+h),(0,255,0),2)
-                        cv2.circle(frame,(int(cx),int(cy)),4,(0,0,255),-1)
+                    x,y,w,h=faces[0]
+                    x,y,w,h=[int(v/SCALE) for v in (x,y,w,h)]
+                    cx,cy=x+w/2,y+h/2
+                    cv2.rectangle(full,(x,y),(x+w,y+h),(0,255,0),2)
+                    cv2.circle(full,(int(cx),int(cy)),4,(0,0,255),-1)
+                    self._centre(cx,cy)
 
-                if ok:
-                    self.mode=Mode.TRACK; self.last_seen=time.time(); self._centre(cx,cy)
-                else:
-                    dt=time.time()-self.last_seen
-                    if dt<MICRO_AFTER: self.mode=Mode.HOLD
-                    elif dt<FULL_AFTER:
-                        if self.mode!=Mode.MICRO: self._init_micro()
-                        self.mode=Mode.MICRO
-                    else: self.mode=Mode.SWEEP
-
-                    if self.mode==Mode.MICRO: self._micro_step()
-                    elif self.mode==Mode.SWEEP: self._sweep_step()
-
-                cv2.putText(frame, MODE_NAMES[self.mode],(10,25),FONT,0.7,(0,255,255),2)
-                cv2.imshow("Desktop‑Sitter", frame)
+                if self.debug:
+                    cv2.putText(full,MODE_NAMES[self.mode],(10,25),
+                                FONT,0.7,(0,255,255),2)
+                cv2.imshow("Desktop‑Sitter", full)
                 if cv2.waitKey(1)&0xFF in (27, ord('q')): break
+                time.sleep(STEP_DELAY)
         finally:
             self.pt.deinit(); self.cam.stop(); cv2.destroyAllWindows()
 
+# -----------------------------------------------------
 if __name__=="__main__":
     FaceTracker(debug=True).run()
