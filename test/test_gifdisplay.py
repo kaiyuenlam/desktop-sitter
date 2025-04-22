@@ -75,7 +75,3 @@ gif_mapping = {
     "disgust": r"C:\Users\lewis\Documents\GitHub\desktop-sitter\emotion_detect\SadTalk.gif",
     "sleepy": r"C:\Users\lewis\Documents\GitHub\desktop-sitter\emotion_detect\Sleep.gif"
 }
-
-# Create and run the app
-app = AnimatedGIFPlayer(gif_mapping)
-app.mainloop()

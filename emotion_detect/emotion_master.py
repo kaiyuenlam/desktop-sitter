@@ -10,7 +10,7 @@ from PIL import Image, ImageTk
 
 # ========== Hugging Face Chatbot API ==========
 HF_API_URL = "https://api-inference.huggingface.co/models/facebook/blenderbot-400M-distill"
-HF_API_KEY = "hf_XXXXXXX"  # <-- Replace with your token
+HF_API_KEY = "hf_FmuBSizXbQfVHZGFwhkHdjiWNzidDKHID"  # <-- Replace with your token
 
 def get_chatbot_response(emotion):
     try:
