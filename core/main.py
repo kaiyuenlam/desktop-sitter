@@ -14,6 +14,5 @@ gif_mapping = {
 }
 
 player = AnimatedGIFPlayer(gif_mapping)
-player.start()
 player.display_emotion("happy")  # to display "happy" gif
-player.update()
+player.start()
