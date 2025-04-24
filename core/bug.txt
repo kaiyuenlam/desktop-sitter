@@ -1,1 +1,0 @@
-Error: API request failed: HTTPSConnectionPool(host='03f9-34-125-202-171.ngrok-free.app', port=443): Max retries exceeded with url: /emotion (Caused by NewConnectionError('<urllib3.connection.HTTPSConnection object at 0xe3228b08>: Failed to establish a new connection: [Errno -3] Temporary failure in name resolution'))
