@@ -15,3 +15,4 @@ pi_servo_env/
 # Logs or temp
 *.log
 
+core/.env
