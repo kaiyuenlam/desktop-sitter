@@ -16,3 +16,4 @@ pi_servo_env/
 *.log
 
 core/.env
+core/.env
