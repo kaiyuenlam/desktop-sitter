@@ -40,6 +40,7 @@ MODE_NAMES = ["INIT", "TRACK"]
 class FaceTracker:
     def __init__(
         self,
+        device_index: int = 0,
         res=(640, 480),
         debug=True,
         headless=False,
@@ -49,7 +50,7 @@ class FaceTracker:
         headless: skip GUI if True
         frame_callback: function(frame) for external use
         """
-        self.cam = Camera(resolution=res)
+        self.cam = Camera(device_index=device_index, resolution=res)
         self.pt = PanTilt(step=1.0)
         self.debug = debug
         self.headless = headless
@@ -58,6 +59,8 @@ class FaceTracker:
         self.w, self.h = res
         self.deg_px_x = THETA_H / self.w
         self.deg_px_y = THETA_V / self.h
+        
+        self.show_window = False
 
         # dynamic dead-zone
         self.dead_x = 40
@@ -66,6 +69,9 @@ class FaceTracker:
 
         # timeout tracking
         self.last_face_time = time.time()
+        
+    def enable_debug_window(self, enable: bool):
+        self.show_window = enable
 
     def _centre(self, cx, cy):
         dx = cx - self.w/2
@@ -150,9 +156,16 @@ class FaceTracker:
                 if not self.headless:
                     if self.debug:
                         cv2.putText(frame, MODE_NAMES[self.mode], (10,25), FONT, 0.7, (0,255,255), 2)
-                    cv2.imshow("Desktop-Sitter", frame)
+                    cv2.imshow("Tracker Debug", frame)
                     if cv2.waitKey(1) & 0xFF in (27, ord('q')):
                         break
+                    
+                if self.show_window:
+                    cv2.putText(frame, MODE_NAMES[self.mode], (10,25), FONT, 0.7, (0,255,255), 2)
+                    cv2.imshow("Camera Debug", frame)
+                    if cv2.waitKey(1) & 0xFF in (27, ord('q')):
+                        break
+                    
                 time.sleep(STEP_DELAY)
         finally:
             self.pt.deinit()
@@ -160,7 +173,11 @@ class FaceTracker:
             if not self.headless:
                 cv2.destroyAllWindows()
 
+
 if __name__ == "__main__":
-    FaceTracker(debug=True).run()
-
-
+    FaceTracker(
+        device_index=0,
+        debug=True,
+        headless=False,
+        frame_callback=None
+    ).run()

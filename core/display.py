@@ -1,3 +1,4 @@
+# display.py
 import tkinter as tk
 from PIL import Image, ImageTk
 import os
@@ -6,18 +7,29 @@ import threading
 import sys
 
 class TextRedirector:
-    def __init__(self, widget):
+    def __init__(self, widget, stream=None):
         self.widget = widget
+        # Forward to whatever stream was current (e.g. the file handle)
+        self.stream = stream or sys.__stdout__
 
     def write(self, message):
-        # Insert text into the console widget
+        # 1) Insert into the Tk debug console
         self.widget.configure(state="normal")
         self.widget.insert("end", message)
         self.widget.configure(state="disabled")
         self.widget.see("end")
+        # 2) Also echo to the underlying stream (→ output.txt)
+        try:
+            self.stream.write(message)
+            self.stream.flush()
+        except Exception:
+            pass
 
     def flush(self):
-        pass
+        try:
+            self.stream.flush()
+        except Exception:
+            pass
 
 class AnimatedGIFPlayer(tk.Tk):
     def __init__(self, gif_mapping):
@@ -25,53 +37,36 @@ class AnimatedGIFPlayer(tk.Tk):
         self.title("Desktop Sitter Display")
         self.attributes("-fullscreen", True)
         self.configure(background="black")
-        self.bind("<Escape>", lambda e: self.destroy())  # Exit fullscreen
-        # Toggle debug mode with 'g' key
+        self.bind("<Escape>", lambda e: self.destroy())
         self.bind("g", lambda e: self.toggle_debug())
         self.bind("G", lambda e: self.toggle_debug())
-        self.config(cursor="none")  # Hide cursor
+        self.config(cursor="none")
 
-        # Container frames
-        self.container = tk.Frame(self, bg="black")
-        self.container.pack(fill=tk.BOTH, expand=True)
-
-        # Left frame for GIF and status
-        self.left_frame = tk.Frame(self.container, bg="black")
-        self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        # Right frame for debug console (hidden initially)
+        # Layout
+        self.container = tk.Frame(self, bg="black"); self.container.pack(fill=tk.BOTH, expand=True)
+        self.left_frame = tk.Frame(self.container, bg="black"); self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.right_frame = tk.Frame(self.container, bg="black")
         self.right_frame_visible = False
 
-        # GIF display label
-        self.gif_label = tk.Label(self.left_frame, bg="black")
-        self.gif_label.pack(fill=tk.BOTH, expand=True)
-
-        # Status label at bottom
-        self.status_label = tk.Label(
-            self.left_frame,
-            text="",
-            fg="white",
-            bg="black",
-            font=("Helvetica", 18)
-        )
+        # GIF + status
+        self.gif_label = tk.Label(self.left_frame, bg="black"); self.gif_label.pack(fill=tk.BOTH, expand=True)
+        self.status_label = tk.Label(self.left_frame, text="", fg="white", bg="black", font=("Helvetica", 18))
         self.status_label.pack(side=tk.BOTTOM, fill=tk.X)
 
-        # Prepare redirectors
-        self.console_text = None
-        self.original_stdout = sys.stdout
-        self.original_stderr = sys.stderr
-        self.tracker_process = None
+        # Debug console plumbing
+        self.console_text     = None
+        self.original_stdout  = sys.stdout
+        self.original_stderr  = sys.stderr
+        self.tracker_process  = None
 
-        # GIF mapping and animation state
+        # Animation state
         self.gif_mapping = gif_mapping
-        self.frames = []
-        self.durations = []
+        self.frames      = []
+        self.durations   = []
         self.current_frame = 0
         self._animation_job = None
 
     def play_gif(self, gif_file):
-        """Load and play the given GIF file."""
         if self._animation_job:
             self.after_cancel(self._animation_job)
         self.frames, self.durations = [], []
@@ -95,7 +90,6 @@ class AnimatedGIFPlayer(tk.Tk):
             self.update_frame()
 
     def update_frame(self):
-        """Update the label with the next frame."""
         if self.frames:
             frame = self.frames[self.current_frame]
             delay = self.durations[self.current_frame]
@@ -104,38 +98,34 @@ class AnimatedGIFPlayer(tk.Tk):
             self._animation_job = self.after(delay, self.update_frame)
 
     def display_emotion(self, keyword):
-        """Select and play GIF based on emotion keyword."""
         if keyword in self.gif_mapping:
             self.play_gif(self.gif_mapping[keyword])
         else:
             print(f"[Error] No GIF mapped to keyword: {keyword}")
 
     def update_status(self, text):
-        """Update the bottom status text."""
         self.status_label.config(text=text)
 
     def toggle_debug(self):
-        """Show or hide the debug console and tracker output."""
+        import sys
+        real_out = sys.stdout
+        real_err = sys.stderr
+
         if not self.right_frame_visible:
-            # Show debug pane
+            # show debug pane
             self.right_frame.pack(side=tk.RIGHT, fill=tk.BOTH)
-            self.console_text = tk.Text(
-                self.right_frame,
-                bg="black",
-                fg="white",
-                font=("Courier", 12)
-            )
+            self.console_text = tk.Text(self.right_frame, bg="black", fg="white", font=("Courier",12))
             self.console_text.pack(fill=tk.BOTH, expand=True)
 
-            # Redirect stdout/stderr
-            sys.stdout = TextRedirector(self.console_text)
-            sys.stderr = TextRedirector(self.console_text)
+            sys.stdout = TextRedirector(self.console_text, stream=real_out)
+            sys.stderr = TextRedirector(self.console_text, stream=real_err)
 
-            # Start tracker subprocess
-            self.start_tracker()
+            if hasattr(self, 'tracker'):
+                self.tracker.enable_debug_window(True)
+
             self.right_frame_visible = True
         else:
-            # Hide debug pane
+            # hide debug pane
             if self.tracker_process:
                 self.tracker_process.terminate()
                 self.tracker_process = None
@@ -144,34 +134,9 @@ class AnimatedGIFPlayer(tk.Tk):
             self.right_frame.pack_forget()
             self.right_frame_visible = False
 
-    def start_tracker(self):
-        """Launch tracker.py and stream its output to the console."""
-        def run():
-            tracker_path = os.path.join(
-                os.path.dirname(__file__), "tracker.py"
-            )
-            self.tracker_process = subprocess.Popen(
-                ["python3", tracker_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True
-            )
-            for line in self.tracker_process.stdout:
-                print(line, end="")
-        threading.Thread(target=run, daemon=True).start()
-
+    def _steam_subprocess(self):
+        for line in self.tracker_process.stdout:
+            print(line, end="")
+            
     def start(self):
-        """Start the Tkinter main loop."""
         self.mainloop()
-
-if __name__ == "__main__":
-    src = os.path.join(os.path.dirname(__file__), "src")
-    gif_mapping = {
-        "happy": os.path.join(src, "HappyTalk.gif"),
-        "sad": os.path.join(src, "SadTalk.gif"),
-        "sleep": os.path.join(src, "Sleep.gif"),
-        "idle": os.path.join(src, "Idle.gif"),
-    }
-    player = AnimatedGIFPlayer(gif_mapping)
-    player.display_emotion("idle")  # default state
-    player.start()

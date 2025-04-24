@@ -1,0 +1,29 @@
+[INFO] tracker start
+[INFO] No face for 30s, reinitializing scan...
+[INFO] No face for 30s, reinitializing scan...
+[INFO] No face for 30s, reinitializing scan...
+[INIT] dead-zone ±130×±130 px
+[TTS] Speaking: Hey, I'm sending you a warm hug. Remember, you're strong and things will get better.
+Hey Im sending you a warm hug. Remember youre strong and things will get better.
+[TTS] Speaking: Taking a moment to recharge? That's perfectly alright. I'll be here when you get back.
+Taking a moment to recharge? Thats perfectly alright. Ill be here when you get back.
+[Error] No GIF mapped to keyword: neutral
+[TTS] Speaking: Hey there! Just checking in—I hope you're having a calm and steady day. Remember, it's okay to just be. ✨
+Hey there! Just checking inI hope youre having a calm and steady day. Remember its okay to just be. 
+[Error] No GIF mapped to keyword: angry
+[TTS] Speaking: Hey, you! I sense you're feeling a bit frustrated. Remember to take a deep breath, and know that I'm here for you. 😊
+Hey you! I sense youre feeling a bit frustrated. Remember to take a deep breath and know that Im here for you. 
+[Error] No GIF mapped to keyword: neutral
+[TTS] Speaking: Hey there! Remember to take a few deep breaths and know that you're doing great. Keep shining! 🌟
+Hey there! Remember to take a few deep breaths and know that youre doing great. Keep shining! 
+[Error] No GIF mapped to keyword: fear
+[TTS] Speaking: Hey, I'm sensing you might be feeling a bit fearful right now. Whatever it is, remember you're strong and you've got this!
+Hey Im sensing you might be feeling a bit fearful right now. Whatever it is remember youre strong and youve got this!
+[Error] No GIF mapped to keyword: neutral
+[TTS] Speaking: Hey, you. I'm here if you need anything at all. Sending you good vibes! 😊
+Hey you. Im here if you need anything at all. Sending you good vibes! 
+[TTS] Speaking: I'm still here, ready when you are. Take your time, and have a great day!
+Im still here ready when you are. Take your time and have a great day!
+[Error] No GIF mapped to keyword: neutral
+[TTS] Speaking: Hey there! I'm sending you some good vibes and hoping things are going okay for you today. 😊
+Hey there! Im sending you some good vibes and hoping things are going okay for you today. 
