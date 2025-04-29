@@ -45,7 +45,7 @@ DETECTION_WINDOW     = 10.0
 DETECTION_THRESHOLD  = 5
 API_THROTTLE         = 30.0
 SCALE                = 0.5
-MIN_AREA_RATIO       = 0.1
+MIN_AREA_RATIO       = 0.2
 ASPECT_TOL           = 0.25
 
 # Initialize TTS & Display
@@ -57,10 +57,10 @@ gif_mapping = {
     'sleep': os.path.join(src, 'Sleep.gif'),
     'idle':  os.path.join(src, 'Idle.gif'),
     'neutral':  os.path.join(src, 'Idle.gif'),
-    'fear':  os.path.join(src, 'SadTalk.gif'), 
+    'fear':  os.path.join(src, 'HappyTalk.gif'), 
 }
 display = AnimatedGIFPlayer(gif_mapping)
-display.display_emotion('idle')
+display.display_emotion('sleep')
 
 display.device_index = 0
 

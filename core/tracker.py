@@ -70,6 +70,12 @@ class FaceTracker:
         # timeout tracking
         self.last_face_time = time.time()
         
+        # FPS
+        self._prev_t = time.time()
+        self._fps = 0.0
+        self._avg_n = 10
+        self._frame_no = 0
+        
     def enable_debug_window(self, enable: bool):
         self.show_window = enable
 
@@ -128,6 +134,7 @@ class FaceTracker:
         self._initial_scan()
         try:
             while True:
+                tic = time.time()
                 frame = self.cam.get_frame()
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 small = cv2.resize(gray, (0,0), fx=SCALE, fy=SCALE)
@@ -156,16 +163,24 @@ class FaceTracker:
                 if not self.headless:
                     if self.debug:
                         cv2.putText(frame, MODE_NAMES[self.mode], (10,25), FONT, 0.7, (0,255,255), 2)
+                        cv2.putText(frame, f'FPS: {self._fps:4.1f}', (10, 50), FONT, 0.7, (0,255,0), 2)
                     cv2.imshow("Tracker Debug", frame)
                     if cv2.waitKey(1) & 0xFF in (27, ord('q')):
                         break
                     
                 if self.show_window:
                     cv2.putText(frame, MODE_NAMES[self.mode], (10,25), FONT, 0.7, (0,255,255), 2)
+                    cv2.putText(frame, f'FPS: {self._fps:4.1f}', (10, 50), FONT, 0.7, (0,255,0), 2)
                     cv2.imshow("Camera Debug", frame)
                     if cv2.waitKey(1) & 0xFF in (27, ord('q')):
                         break
-                    
+                
+                toc = time.time()
+                self._frame_no += 1
+                inst = 1.0 / max(toc - tic, 1e-6)
+                w = 1.0 / self._avg_n
+                self._fps = (1 - w) * self._fps + w * inst
+                
                 time.sleep(STEP_DELAY)
         finally:
             self.pt.deinit()
