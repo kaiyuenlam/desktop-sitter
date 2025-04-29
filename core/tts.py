@@ -10,8 +10,8 @@ class TextToSpeech:
         """
         Simplify punctuation for better espeak compatibility.
         """
-        text = re.sub(r'[\U00010000-\U0010FFFF]', '', text)
-        text = re.sub(r'[^\w\s.!?]', '', text)  # remove unsupported punctuation
+        text = re.sub(r'[\U00010000-\U0010FFFF]', '', text) #Remove emojis
+        text = re.sub(r'[^\w\s\'-.!?]', '', text)  # remove unsupported punctuation
         text = text.replace("...", ".")
         return text
 

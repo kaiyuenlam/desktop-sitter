@@ -5,25 +5,28 @@ import os
 import subprocess
 import threading
 import sys
+from threading import Lock
 
 class TextRedirector:
     def __init__(self, widget, stream=None):
         self.widget = widget
         # Forward to whatever stream was current (e.g. the file handle)
         self.stream = stream or sys.__stdout__
+        self.lock = Lock()
 
     def write(self, message):
-        # 1) Insert into the Tk debug console
-        self.widget.configure(state="normal")
-        self.widget.insert("end", message)
-        self.widget.configure(state="disabled")
-        self.widget.see("end")
-        # 2) Also echo to the underlying stream (→ output.txt)
-        try:
-            self.stream.write(message)
-            self.stream.flush()
-        except Exception:
-            pass
+        with self.lock:
+            # 1) Insert into the Tk debug console
+            self.widget.configure(state="normal")
+            self.widget.insert("end", message)
+            self.widget.configure(state="disabled")
+            self.widget.see("end")
+            # 2) Also echo to the underlying stream (→ output.txt)
+            try:
+                self.stream.write(message)
+                self.stream.flush()
+            except Exception:
+                pass
 
     def flush(self):
         try:

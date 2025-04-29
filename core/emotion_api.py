@@ -21,7 +21,7 @@ def read_api_url(filepath: str = 'url.txt') -> str:
     return url.rstrip('/')
 
 
-def send_image_to_api(image_bytes: bytes) -> dict:
+def send_image_to_api(image_bytes: bytes, retries=3) -> dict:
     """
     Send the given JPEG image bytes to the emotion API and return the parsed JSON response.
 
@@ -30,12 +30,15 @@ def send_image_to_api(image_bytes: bytes) -> dict:
     api_url = read_api_url()
     endpoint = f"{api_url}/emotion"
     headers = {'Content-Type': 'application/octet-stream'}
-    try:
-        resp = requests.post(endpoint, headers=headers, data=image_bytes, timeout=10)
-        resp.raise_for_status()
-        return resp.json()
-    except requests.RequestException as e:
-        return {"status": "error", "error": str(e)}
+    for attempt in range(retries):
+        try:
+            resp = requests.post(endpoint, headers=headers, data=image_bytes, timeout=10)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException as e:
+            if attempt == retries - 1:
+                return {"status": "error", "error": str(e)}
+            time.sleep(2)
 
 
 # Optional: standalone test entrypoint

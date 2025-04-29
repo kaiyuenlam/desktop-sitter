@@ -41,7 +41,7 @@ class FaceTracker:
     def __init__(
         self,
         device_index: int = 0,
-        res=(640, 480),
+        res=(320, 240),
         debug=True,
         headless=False,
         frame_callback=None
