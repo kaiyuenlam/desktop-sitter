@@ -92,8 +92,15 @@ async def on_frame(frame):
             logger.debug('Sending image to API')
             ret, buf = cv2.imencode('.jpg', frame)
             if not ret:
+                logger.error('Failed to encode frame to JPEG')
                 return
-            result = send_image_to_api(buf.tobytes())
+            # Cache API result to reduce calls
+            if hasattr(on_frame, 'last_result') and now - on_frame.last_api_time < 10:
+                result = on_frame.last_result
+            else:      
+                result = send_image_to_api(buf.tobytes())
+                on_frame.last_result = result
+            
             logger.debug(f'API result: {result}')
             on_frame.last_api_time = now
             on_frame.detections.clear()
