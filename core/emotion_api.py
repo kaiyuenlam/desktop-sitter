@@ -38,7 +38,6 @@ def send_image_to_api(image_bytes: bytes, retries=3) -> dict:
         except requests.RequestException as e:
             if attempt == retries - 1:
                 return {"status": "error", "error": str(e)}
-            time.sleep(2)
 
 
 # Optional: standalone test entrypoint

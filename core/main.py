@@ -36,7 +36,7 @@ logger = logging.getLogger()
 
 # — Redirect everything into output.txt (overwrite each run) —
 log_path = os.path.join(os.path.dirname(__file__), 'output.txt')
-log_file  = open(log_path, 'a')
+log_file  = open(log_path, 'w')
 sys.stdout = log_file
 sys.stderr = log_file
 
@@ -119,7 +119,7 @@ async def on_frame(frame):
             else:
                 err = result.get('error','Unknown API error')
                 loop.call_soon_threadsafe(display.update_status, f'Error: {err}')
-    except Exception:
+    except Exception as e:
         logger.error(f'Error in on_frame: {str(e)}', exc_info=True)
         raise
 
@@ -131,8 +131,7 @@ def on_frame_wrapper(frame):
     try:
         logger.debug('Calling on_frame_wrapper')
         coro = on_frame(frame)
-        future = asyncio.run_coroutine_threadsafe(coro, loop)
-        future.result()
+        asyncio.run_coroutine_threadsafe(coro, loop)
     except Exception as e:
         logger.error(f'Error in on_frame_wrapper: {str(e)}', exc_info=True)
 
@@ -149,7 +148,7 @@ def integrate_asyncio_tkinter():
     """
     try:
         loop.run_until_complete(loop.create_task(asyncio.sleep(0))) # Process async
-        display.after(10, integrate_asyncio_tkinter) # Schedule next check
+        display.after(50, integrate_asyncio_tkinter) # Schedule next check
     except Exception as e:
         logger.error(f'Error in asyncio_tkinter integration: {str(e)}', exc_info=True)
 
@@ -163,6 +162,7 @@ if __name__ == '__main__':
     except Exception as e:
         logger.error(f'Main loop error: {str(e)}', exc_info=True)
     finally:
+        logger.info('Saving profiling data')
         profiler.disable()
         profiler.dump_stats('profile_stats.prof')
         ps = pstats.Stats(profiler, stream = log_file)
